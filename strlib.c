@@ -11,24 +11,38 @@ typedef struct {
     size_t cap;     // the total capacity of the buffer in bytes
 } sl_hdr;
 
+
 /**
- * get the pointer to the header from a pointer to the string payload
- * note: str must point to the payload returned by sl_create
+ * get the pointer to the header safely from a pointer to string payload
+ * returns NULL if str is invalid
  */
-static inline sl_hdr* sl_get_hdr(const char *str) { 
-    return (sl_hdr*)((const char*)str - sizeof(sl_hdr));
+static inline sl_hdr* sl_get_hdr(const char *str, sl_err *out_err) { 
+    if(!str) {
+        if(out_err) *out_err = SL_ERR_NULL;
+        return NULL;
+    }
+    sl_hdr *hdr = (sl_hdr*)((const char*)str - sizeof(sl_hdr));
+
+    if (hdr->magic != SL_MAGIC) {
+        if (out_err) *out_err = SL_ERR_INVALID_MAGIC;
+        return NULL;
+    }
+
+    if (out_err) *out_err = SL_OK;
+    return hdr;
 }
 
+
 /**
- * validate a pointer and returns an sl_err code
+ * validate a string pointer
  */
 sl_err sl_validate(const char *str) {
-    if(!str) return SL_ERR_NULL;
-    sl_hdr *hdr = sl_get_hdr(str);
+    sl_err err;
+    sl_hdr *hdr = sl_get_hdr(str, &err);
+    if (!hdr) return err;
 
-    if(hdr->magic != SL_MAGIC) return SL_ERR_INVALID_MAGIC;
-    if(hdr->len > hdr->cap) return SL_ERR_OVERFLOW;
-    if(str[hdr->len] != '\0') return SL_ERR_TERM;
+    if (hdr->len > hdr->cap) return SL_ERR_OVERFLOW;
+    if (str[hdr->len] != '\0') return SL_ERR_TERM;
 
     return SL_OK;
 }
@@ -47,8 +61,8 @@ char* sl_create(const char *init, sl_err *out_err) {
     if(payload_size < SL_MIN_CAP) payload_size = SL_MIN_CAP;
 
     // check for overflow
-    if(payload_size > SIZE_MAX - sizeof(sl_hdr)) {
-        if(out_err) *out_err = SL_ERR_OVERFLOW;
+    if (payload_size > SIZE_MAX - sizeof(sl_hdr)) {
+        if (out_err) *out_err = SL_ERR_OVERFLOW;
         return NULL;
     }
 
@@ -82,8 +96,9 @@ char* sl_create(const char *init, sl_err *out_err) {
 sl_err sl_free(char **pstr){
     if (!pstr || !*pstr) return SL_ERR_NULL;
 
-    sl_hdr *hdr = sl_get_hdr(*pstr);
-    if (hdr->magic != SL_MAGIC) return SL_ERR_INVALID_MAGIC;
+    sl_err err;
+    sl_hdr *hdr = sl_get_hdr(*pstr, &err);
+    if(!hdr) return err;
 
     hdr->magic = 0; // invalidate
     free(hdr);
@@ -102,18 +117,20 @@ sl_err sl_free(char **pstr){
  *   - on failure: 0 (check out_err if provided)
  */
 size_t sl_cap(const char *str, sl_err *out_err){
-    if(!str) {
-        if(out_err) *out_err = SL_ERR_NULL;
-        return 0;
-    }
+    sl_hdr *hdr = sl_get_hdr(str, out_err);
+    return hdr ? hdr->cap : 0;
+}
 
-    sl_hdr *hdr = sl_get_hdr(str);
-
-    if (hdr->magic != SL_MAGIC) {
-        if (out_err) *out_err = SL_ERR_INVALID_MAGIC;
-        return 0;
-    }
-
-    if (out_err) *out_err = SL_OK;
-    return hdr->cap;
+/**
+ * returns the length of the string buffer (not including the header)
+ * 
+ * str: pointer to the string payload
+ *
+ * return:
+ *   - on success: length of the string in bytes (without '\0')
+ *   - on failure: 0 (you need to check out_err to be sure if it is an error or the string is empty)
+ */
+size_t sl_len(const char *str, sl_err *out_err){
+    sl_hdr *hdr = sl_get_hdr(str, out_err);
+    return hdr ? hdr->len : 0;
 }

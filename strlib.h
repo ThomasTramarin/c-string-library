@@ -21,5 +21,6 @@ char *sl_create(const char *init, sl_err *out_err);
 sl_err sl_free(char **pstr);
 sl_err sl_validate(const char *str);
 size_t sl_cap(const char *str, sl_err *out_err);
+size_t sl_len(const char *str, sl_err *out_err);
 
 #endif

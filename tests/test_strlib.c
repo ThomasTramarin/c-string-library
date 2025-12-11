@@ -28,7 +28,15 @@ int main(void) {
 
     err = sl_free(&s);
     assert(err == SL_OK);
+    sl_free(&s);
 
+    // Test 4: length and capacity
+    s = sl_create("hello", NULL);
+    assert(s != NULL);
+    assert(sl_cap(s, NULL) == 16);
+    assert(sl_len(s, NULL) == 5);
+
+    sl_free(&s);
     printf("all tests passed\n");
     return 0;
 }
