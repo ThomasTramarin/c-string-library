@@ -1,32 +1,50 @@
 #include "sl_string.h"
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 #include <stddef.h>
 
-#include <stdio.h>
+// this constant is used to verify if the string is valid
+#define SL_MAGIC 0x534C4942 
 
 /** 
  * Header string
  * 
  * The string is stored as a struct `sl_hdr` followed immediately by
- * the char* buffer in memory
+ * the char* buffer in memory.
  * 
- * Fields:
- * @field len Length of the string (excluding null terminator)
- * @field cap Is the capacity of the data buffer (including space for null terminator)
- *            The total allocated size for the string is sizeof(sl_hdr) + cap
- *          
- * Memory layout:
- *  [sl_hdr struct][data buffer of size cap]
- * 
- * @field data Is a flexible array member. 
- *             The struct itself does not allocate space for it .
+ * Total allocated size: sizeof(sl_hdr) + cap
  */
-typedef struct {
-    size_t len;
-    size_t cap;
-    char data[];
+typedef struct sl_hdr {
+    uint32_t magic; /**< If set to SL_MAGIC, the string is valid */
+    size_t len;     /**< Length of the string (excluding null term) */
+    size_t cap;     /**< Capacity of data buffer (including null term) */
+    char data[];    /**< Flexible array member (the data buffer) */
 } sl_hdr;
+
+/**
+ * Utility function to set an error to a sl_err variable
+ */
+static inline void sl_set_err(sl_err *err, sl_err code) {
+    if(err) *err = code;
+}
+
+/**
+ * Get the pointer to the header of a string
+ * 
+ * This function calculates the pointer to the `sl_hdr` structure
+ * given a pointer to the `data` buffer
+ * 
+ * @param s Pointer to the string's data buffer
+ * @return Pointer to `sl_hdr`
+ * 
+ * @note This function is only used internally. It assumes the string
+ *       was allocated by the library
+ */
+static inline sl_hdr *sl_get_hdr(const sl_str s) {
+    return (sl_hdr *)((char *)s - offsetof(sl_hdr, data));
+}
+
 
 /**
  * Create a new dynamic string (`sl_str`) from a null-terminated C string.
@@ -37,26 +55,34 @@ typedef struct {
  * 
  * @param init A pointer to a null-terminated C string. 
  *             It must not contain any zero bytes except the terminating null.
+ * @param err A pointer to the error variable
  * 
  * @note The function stops at the first null byte. Any null bytes inside the string
  *       before the terminator will be treated as the end of the string.
  */
-sl_str sl_from_cstr(const char *init){
-    if(!init) return NULL;
+sl_str sl_from_cstr(const char *init, sl_err *err){
+    if(!init) {
+        sl_set_err(err, SL_ERR_NULL);
+        return NULL;
+    }
 
     size_t len = strlen(init);
     size_t cap = len + 1; // +1 (the null term)
 
-    sl_hdr *hdr = malloc(sizeof(sl_hdr) + cap);
-    if(!hdr) return NULL; // check malloc
+    sl_hdr *hdr = malloc(offsetof(sl_hdr, data) + cap);
+    if(!hdr) {
+        sl_set_err(err, SL_ERR_ALLOC);
+        return NULL;
+    } 
 
+    hdr->magic = SL_MAGIC;
     hdr->len = len;
     hdr->cap = cap;
 
     // copy `init` into `data`
-    memcpy(hdr->data, init, len);
-    hdr->data[len] = '\0';
+    memcpy(hdr->data, init, len + 1);
 
+    sl_set_err(err, SL_OK);
     return hdr->data;
 }
 
@@ -64,18 +90,29 @@ sl_str sl_from_cstr(const char *init){
  * Free the memory allocated for a dynamic string
  * 
  * This function releases the memory of a string previously created.
- * It safely calculates the pointer to the string header.
  * 
  * @param str Pointer to the `data` member
- * @note If str is null the function does nothing
  * @warning The implementation assumes the string was allocated with
  *          a function of this library such as `sl_from_cstr` and has
  *          a valid header before the data buffer.
  */
-void sl_free(sl_str str){
-    if(!str) return;
+void sl_free(sl_str *str, sl_err *err){
+    // if the string doesn't exists, do nothing
+    if(!str || !*str) {
+        sl_set_err(err, SL_OK);
+        return;
+    }
 
-    // calculate the pointer to the header 
-    sl_hdr *hdr = (sl_hdr*)((char*)str - offsetof(sl_hdr, data));
+    sl_hdr *hdr = sl_get_hdr(*str);
+
+    if(hdr->magic != SL_MAGIC) {
+        sl_set_err(err, SL_ERR_INVALID);
+        return;
+    }
+
+    hdr->magic = 0; // invalidate the string
     free(hdr);
+    *str = NULL;    // prevent use after free
+
+    sl_set_err(err, SL_OK);
 }
