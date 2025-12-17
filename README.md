@@ -65,6 +65,7 @@ int main(void) {
 ```
 
 ## API
+
 ### sl_from_cstr
 ```c
 sl_str sl_from_cstr(const char *init, sl_err *err);
@@ -84,6 +85,8 @@ Creates a new string from a null-terminated C string.
 - `SL_ERR_ALLOC`: Memory allocation failed
 - `SL_ERR_NULL`: Input `init` is `NULL`
 
+---
+
 ### sl_free
 ```c
 void sl_free(sl_str *str, sl_err *err);
@@ -95,6 +98,29 @@ Frees the memory allocated and invalidates the pointer (set it to `NULL` and inv
 #### Parameters
 - `str`: Pointer to the `sl_str` variable
 - `err`: Pointer to a `sl_err` variable, can be `NULL`
+
+#### Error Codes
+- `SL_OK`: Success
+- `SL_ERR_INVALID`: String is not valid (not created by the library)
+- `SL_ERR_NULL`: Input pointer is `NULL`
+
+---
+
+### sl_len
+```c
+size_t sl_len(sl_str str, sl_err *err);
+```
+
+#### Description
+Returns the length of a string.
+
+#### Parameters
+- `str`: Pointer to the `sl_str` variable
+- `err`: Pointer to a `sl_err` variable, can be `NULL`
+
+#### Returns
+- The length of the string (number of characters excluding the null terminator) on success.
+- `SIZE_MAX` if an error occured (check `err` for more details).
 
 #### Error Codes
 - `SL_OK`: Success

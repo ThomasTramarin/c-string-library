@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <limits.h>
 #include <stddef.h>
 
 // this constant is used to verify if the string is valid
@@ -91,7 +92,8 @@ sl_str sl_from_cstr(const char *init, sl_err *err){
  * 
  * This function releases the memory of a string previously created.
  * 
- * @param str Pointer to the `data` member
+ * @param str Pointer to the `sl_str` variable (pointer to the string pointer)
+ * @param err A pointer to the error variable
  * @warning The implementation assumes the string was allocated with
  *          a function of this library such as `sl_from_cstr` and has
  *          a valid header before the data buffer.
@@ -115,4 +117,27 @@ void sl_free(sl_str *str, sl_err *err){
     *str = NULL;    // prevent use after free
 
     sl_set_err(err, SL_OK);
+}
+
+/**
+ * Check the length of a string
+ * 
+ * @param str Pointer to the string buffer
+ * @param err Pointer to an `sl_err` variable, can be NULL
+ * @return Length of the string, or `SIZE_MAX` if error occurred
+ */
+size_t sl_len(sl_str str, sl_err *err){
+    if(!str) {
+        sl_set_err(err, SL_ERR_NULL);
+        return SIZE_MAX;
+    }
+
+    sl_hdr *hdr = sl_get_hdr(str);
+    if(hdr->magic != SL_MAGIC) {
+        sl_set_err(err, SL_ERR_INVALID);
+        return SIZE_MAX;
+    }
+
+    sl_set_err(err, SL_OK);
+    return hdr->len;
 }
