@@ -30,6 +30,7 @@ static inline void sl_set_err(sl_err *err, sl_err code) {
     if(err) *err = code;
 }
 
+
 /**
  * Get the pointer to the header of a string
  * 
@@ -40,10 +41,34 @@ static inline void sl_set_err(sl_err *err, sl_err code) {
  * @return Pointer to `sl_hdr`
  * 
  * @note This function is only used internally. It assumes the string
- *       was allocated by the library
+ *       was allocated by the library (sl_validate will validate the string)
  */
-static inline sl_hdr *sl_get_hdr(const sl_str s) {
-    return (sl_hdr *)((char *)s - offsetof(sl_hdr, data));
+static inline sl_hdr *sl_get_hdr(const sl_str str) {
+    return (sl_hdr *)((char *)str - offsetof(sl_hdr, data));
+}
+
+/**
+ * Validate that the string `str` was created by the library
+ * 
+ * @param str The string to validate
+ * @param out_hdr A pointer to the string header. This param can be NULL
+ *                and it is used to avoid recalculating the header in functions
+ *                that use it.
+ * 
+ * @return A value of the sl_err enum representing the error code
+ */
+static inline sl_err sl_validate(sl_str str, sl_hdr **out_hdr){
+    if(!str) return SL_ERR_NULL;
+    
+    sl_hdr *hdr = sl_get_hdr(str);
+
+    // if the magic does not match the value of the SL_VALID constant,
+    // it menas string was not created by the library or has been invalidated
+    if(hdr->magic != SL_MAGIC) return SL_ERR_INVALID;
+
+    if(out_hdr) *out_hdr = hdr;
+
+    return SL_OK;
 }
 
 
@@ -99,16 +124,17 @@ sl_str sl_from_cstr(const char *init, sl_err *err){
  *          a valid header before the data buffer.
  */
 void sl_free(sl_str *str, sl_err *err){
-    // if the string doesn't exists, do nothing
-    if(!str || !*str) {
+    // do nothing
+    if (!str || !*str) {
         sl_set_err(err, SL_OK);
         return;
     }
 
-    sl_hdr *hdr = sl_get_hdr(*str);
+    sl_hdr *hdr;
+    sl_err e = sl_validate(*str, &hdr);
 
-    if(hdr->magic != SL_MAGIC) {
-        sl_set_err(err, SL_ERR_INVALID);
+    if(e != SL_OK) {
+        sl_set_err(err, e);
         return;
     }
 
@@ -127,14 +153,11 @@ void sl_free(sl_str *str, sl_err *err){
  * @return Length of the string, or `SIZE_MAX` if error occurred
  */
 size_t sl_len(sl_str str, sl_err *err){
-    if(!str) {
-        sl_set_err(err, SL_ERR_NULL);
-        return SIZE_MAX;
-    }
+    sl_hdr *hdr;
+    sl_err e = sl_validate(str, &hdr);
 
-    sl_hdr *hdr = sl_get_hdr(str);
-    if(hdr->magic != SL_MAGIC) {
-        sl_set_err(err, SL_ERR_INVALID);
+    if(e != SL_OK) {
+        sl_set_err(err, e);
         return SIZE_MAX;
     }
 
