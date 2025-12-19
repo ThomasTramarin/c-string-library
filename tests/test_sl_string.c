@@ -14,6 +14,7 @@ void test_sl_from_cstr(void) {
     TEST_ASSERT_EQUAL_STRING("Hello", s);
     TEST_ASSERT_EQUAL(SL_OK, err);
     TEST_ASSERT_EQUAL(5, sl_len(s, &err));
+    TEST_ASSERT_EQUAL(6, sl_cap(s, &err));
     TEST_ASSERT_EQUAL(SL_OK, err);
 
     // Test free
@@ -24,6 +25,7 @@ void test_sl_from_cstr(void) {
     s = sl_from_cstr("Hel\0lo", &err);
     TEST_ASSERT_EQUAL_STRING("Hel", s);
     TEST_ASSERT_EQUAL(3, sl_len(s, &err));
+    TEST_ASSERT_EQUAL(4, sl_cap(s, &err));
     sl_free(&s, NULL);
     TEST_ASSERT_NULL(s);
 

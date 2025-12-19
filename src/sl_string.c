@@ -146,7 +146,7 @@ void sl_free(sl_str *str, sl_err *err){
 }
 
 /**
- * Check the length of a string
+ * Get the length of a string
  * 
  * @param str Pointer to the string buffer
  * @param err Pointer to an `sl_err` variable, can be NULL
@@ -163,4 +163,27 @@ size_t sl_len(sl_str str, sl_err *err){
 
     sl_set_err(err, SL_OK);
     return hdr->len;
+}
+
+/**
+ * Get the capacity of a string
+ * 
+ * The capacity represents the number of bytes reserved for the string buffer.
+ * Thus, the total allocated size for the string is sizeof(sl_hdr) + capacity.
+ * 
+ * @param str Pointer to the string buffer
+ * @param err Pointer to an `sl_err` variable, can be NULL
+ * @return Capacity of the string, or `SIZE_MAX` if error occurred
+ */
+size_t sl_cap(sl_str str, sl_err *err){
+    sl_hdr *hdr;
+    sl_err e = sl_validate(str, &hdr);
+
+    if(e != SL_OK) {
+        sl_set_err(err, e);
+        return SIZE_MAX;
+    }
+
+    sl_set_err(err, SL_OK);
+    return hdr->cap;
 }

@@ -126,3 +126,25 @@ Returns the length of a string.
 - `SL_OK`: Success
 - `SL_ERR_INVALID`: String is not valid (not created by the library)
 - `SL_ERR_NULL`: Input pointer is `NULL`
+
+### sl_cap
+```c
+size_t sl_cap(sl_str str, sl_err *err);
+```
+
+#### Description
+Returns the capacity of a string
+
+#### Parameters
+- `str`: Pointer to the `sl_str` variable
+- `err`: Pointer to a `sl_err` variable, can be `NULL`
+
+#### Returns
+- The capacity of the string (number of bytes reserved for the string buffer) on success.
+- `SIZE_MAX` if an error occured (check `err` for more details).
+
+#### Error Codes
+- `SL_OK`: Success
+- `SL_ERR_INVALID`: String is not valid (not created by the library)
+- `SL_ERR_NULL`: Input pointer is `NULL`
+
