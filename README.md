@@ -37,6 +37,7 @@ Where `sl_hdr` contains:
 Users never access the header directly. They only use the `sl_str` pointer (pointer to data buffer)
 
 ## Example
+Copy this code into your project to see the library in action.
 ```c
 #include <sl_string.h> // Include the header file
 #include <stdio.h>
@@ -45,14 +46,26 @@ int main(void) {
     sl_err err;
 
     // Create a dynamic string from a C string
-    sl_str s = sl_from_cstr("Hello World", &err);
+    sl_str s = sl_from_cstr("Hello", &err);
     if(!s) {
         fprintf(stderr, "Error creating the string: %d\n", err);
         return 1;
     }
 
-    // Print the string
-    printf("%s\n", s);
+    printf("Initial string: %s\n", s);
+    printf("Length: %lu\n", sl_len(s, &err));
+    printf("Capacity: %lu\n\n", sl_cap(s, &err));
+
+    // Append a new C string
+    s = sl_append_cstr(s, " World", &err);
+    if(!s) {
+        fprintf(stderr, "Error appending string: %d\n", err);
+        return 1;
+    }
+
+    printf("After append: %s\n", s);
+    printf("Length: %lu\n", sl_len(s, &err));
+    printf("Capacity: %lu\n\n", sl_cap(s, &err));
 
     // Free the string
     sl_free(&s, &err);
@@ -66,7 +79,7 @@ int main(void) {
 
 ## API
 
-### sl_from_cstr
+### `sl_from_cstr`
 ```c
 sl_str sl_from_cstr(const char *init, sl_err *err);
 ```
@@ -87,7 +100,7 @@ Creates a new string from a null-terminated C string.
 
 ---
 
-### sl_free
+### `sl_free`
 ```c
 void sl_free(sl_str *str, sl_err *err);
 ```
@@ -106,7 +119,7 @@ Frees the memory allocated and invalidates the pointer (set it to `NULL` and inv
 
 ---
 
-### sl_len
+### `sl_len`
 ```c
 size_t sl_len(sl_str str, sl_err *err);
 ```
@@ -127,7 +140,7 @@ Returns the length of a string.
 - `SL_ERR_INVALID`: String is not valid (not created by the library)
 - `SL_ERR_NULL`: Input pointer is `NULL`
 
-### sl_cap
+### `sl_cap`
 ```c
 size_t sl_cap(sl_str str, sl_err *err);
 ```
@@ -147,4 +160,30 @@ Returns the capacity of a string
 - `SL_OK`: Success
 - `SL_ERR_INVALID`: String is not valid (not created by the library)
 - `SL_ERR_NULL`: Input pointer is `NULL`
+
+### `sl_append_cstr`
+
+```c
+sl_str sl_append_cstr(sl_str str, const char *init, sl_err *err);
+```
+
+#### Description
+Appends the content of a null-terminated C string to the end of a dynamic string.
+Memory is reallocated exactly to fit the new length + null terminator if needed.
+
+#### Parameters
+- `str`: the dynamic string to append to
+- `init`: the C string to append
+- `err`: Pointer to a `sl_err` variable, can be `NULL`
+
+#### Returns
+- The reallocated string pointer after append
+- `NULL` if memory allocation fails
+- The original `str` if validation fails or `init` is `NULL`
+
+#### Error Codes
+- `SL_OK`: Success
+- `SL_ERR_ALLOC`: Memory allocation failed
+- `SL_ERR_INVALID`: String is not valid
+- `SL_ERR_NULL`: Input `init` is null or string pointer is `NULL`
 

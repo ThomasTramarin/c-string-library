@@ -169,7 +169,7 @@ size_t sl_len(sl_str str, sl_err *err){
  * Get the capacity of a string
  * 
  * The capacity represents the number of bytes reserved for the string buffer.
- * Thus, the total allocated size for the string is sizeof(sl_hdr) + capacity.
+ * Thus, the total memory used by the string is sizeof(sl_hdr) + capacity.
  * 
  * @param str Pointer to the string buffer
  * @param err Pointer to an `sl_err` variable, can be NULL
@@ -186,4 +186,57 @@ size_t sl_cap(sl_str str, sl_err *err){
 
     sl_set_err(err, SL_OK);
     return hdr->cap;
+}
+
+/**
+ * Append a null-terminated C string to a `sl_str`
+ * 
+ * This function appends the content of `init` to the end of `str`
+ * The memory is reallocated exactly to fit the new string + term.
+ * 
+ * @param str The dynamic string to append to. Must be a valid `sl_str`.
+ * @param init A null-terminated C string to append. Must not be NULL.
+ * @param err Pointer to an `sl_err` variable, can be NULL.
+ * 
+ * @return The reallocated string pointer after append.
+ *         Returns NULL if memory allocation fails.
+ */
+sl_str sl_append_cstr(sl_str str, const char *init, sl_err *err){
+    if(!init) {
+        sl_set_err(err, SL_ERR_NULL);
+        return str;
+    }
+
+    sl_hdr *hdr;
+    sl_err e = sl_validate(str, &hdr);
+
+    if(e != SL_OK) {
+        sl_set_err(err, e);
+        return str;
+    }
+
+    // calculate the new length of the string
+    size_t init_len = strlen(init);
+    size_t new_len = hdr->len + init_len;
+    size_t new_cap = new_len + 1;
+
+    // if new capacity exceeds the current capacity, reallocate the memory
+    if(new_cap > hdr->cap) {
+        sl_hdr *new_hdr = realloc(sl_get_hdr(str), offsetof(sl_hdr, data) + new_cap);
+        if(!new_hdr) {
+            sl_set_err(err, SL_ERR_ALLOC);
+            return NULL; 
+        }
+        hdr = new_hdr;
+    }
+
+    // append the new string
+    memcpy(hdr->data + hdr->len, init, init_len + 1);
+
+    // set new field values
+    hdr->len = new_len;
+    hdr->cap = new_cap;
+    
+    sl_set_err(err, SL_OK);
+    return hdr->data;
 }

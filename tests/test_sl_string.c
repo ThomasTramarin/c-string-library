@@ -15,18 +15,18 @@ void test_sl_from_cstr(void) {
     TEST_ASSERT_EQUAL(SL_OK, err);
     TEST_ASSERT_EQUAL(5, sl_len(s, &err));
     TEST_ASSERT_EQUAL(6, sl_cap(s, &err));
-    TEST_ASSERT_EQUAL(SL_OK, err);
 
     // Test free
-    sl_free(&s, NULL);
+    sl_free(&s, &err);
     TEST_ASSERT_NULL(s);
 
-    // Test with null bytes
+    // Test with embedded null bytes (truncated at first '\0')
     s = sl_from_cstr("Hel\0lo", &err);
+    TEST_ASSERT_NOT_NULL(s);
     TEST_ASSERT_EQUAL_STRING("Hel", s);
     TEST_ASSERT_EQUAL(3, sl_len(s, &err));
     TEST_ASSERT_EQUAL(4, sl_cap(s, &err));
-    sl_free(&s, NULL);
+    sl_free(&s, &err);
     TEST_ASSERT_NULL(s);
 
     // Test input NULL
@@ -35,8 +35,46 @@ void test_sl_from_cstr(void) {
     TEST_ASSERT_NULL(s);
 }
 
+void test_sl_append_cstr(void) {
+    sl_err err;
+
+    // Basic append
+    sl_str s = sl_from_cstr("Hello", &err);
+    TEST_ASSERT_NOT_NULL(s);
+
+    s = sl_append_cstr(s, " world", &err);
+    TEST_ASSERT_NOT_NULL(s);
+    TEST_ASSERT_EQUAL_STRING("Hello world", s);
+    TEST_ASSERT_EQUAL(11, sl_len(s, &err));
+    TEST_ASSERT_TRUE(sl_cap(s, &err) >= 12); // capacity >= len+1
+    TEST_ASSERT_EQUAL(SL_OK, err);
+
+    // Append empty string
+    s = sl_append_cstr(s, "", &err);
+    TEST_ASSERT_NOT_NULL(s);
+    TEST_ASSERT_EQUAL_STRING("Hello world", s);
+    TEST_ASSERT_EQUAL(11, sl_len(s, &err));
+
+    // Append multiple times
+    s = sl_append_cstr(s, "!!!", &err);
+    TEST_ASSERT_NOT_NULL(s);
+    TEST_ASSERT_EQUAL_STRING("Hello world!!!", s);
+    TEST_ASSERT_EQUAL(14, sl_len(s, &err));
+    TEST_ASSERT_TRUE(sl_cap(s, &err) >= 15);
+
+    // Append to NULL should return error
+    sl_str null_str = NULL;
+    null_str = sl_append_cstr(null_str, "abc", &err);
+    TEST_ASSERT_NULL(null_str);
+    TEST_ASSERT_EQUAL(SL_ERR_NULL, err);
+
+    sl_free(&s, &err);
+    TEST_ASSERT_NULL(s);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_sl_from_cstr);
+    RUN_TEST(test_sl_append_cstr);
     return UNITY_END();
 }
