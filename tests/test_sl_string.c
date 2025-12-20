@@ -72,9 +72,47 @@ void test_sl_append_cstr(void) {
     TEST_ASSERT_NULL(s);
 }
 
+void test_use_after_free(void) {
+    sl_err err;
+    sl_str s = sl_from_cstr("Hello", &err);
+    sl_free(&s, &err);
+
+    TEST_ASSERT_NULL(s);
+
+    size_t len = sl_len(s, &err);
+    TEST_ASSERT_EQUAL(SIZE_MAX, len);
+    TEST_ASSERT_EQUAL(SL_ERR_NULL, err);
+}
+
+void test_sl_eq(void) {
+    sl_err err;
+    sl_str a = sl_from_cstr("Hello", &err);
+    sl_str b = sl_from_cstr("Hello", &err);
+    sl_str c = sl_from_cstr("World", &err);
+
+    TEST_ASSERT_TRUE(sl_eq(a, b, &err));
+    TEST_ASSERT_EQUAL(SL_OK, err);
+
+    TEST_ASSERT_FALSE(sl_eq(a, c, &err));
+    TEST_ASSERT_EQUAL(SL_OK, err);
+
+    // Same pointer
+    TEST_ASSERT_TRUE(sl_eq(a, a, &err));
+
+    // Invalid string
+    sl_free(&b, &err);
+    TEST_ASSERT_FALSE(sl_eq(a, b, &err));
+    TEST_ASSERT_EQUAL(SL_ERR_NULL, err);
+
+    sl_free(&a, &err);
+    sl_free(&c, &err);
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_sl_from_cstr);
     RUN_TEST(test_sl_append_cstr);
+    RUN_TEST(test_use_after_free);
+    RUN_TEST(test_sl_eq);
     return UNITY_END();
 }
