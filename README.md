@@ -127,11 +127,11 @@ if (err != SL_OK) {
 ## Example
 Copy this code into your project to see the library in action.
 ```c
-#include <sl_string.h> // Include the header file
+#include "sl_string.h" // Include the header file
 #include <stdio.h>
 
 int main(void) {
-    sl_err err;
+    sl_err err = SL_OK;
 
     // Create a dynamic string from a C string
     sl_str s = sl_from_cstr("Hello", &err);
@@ -141,8 +141,8 @@ int main(void) {
     }
 
     printf("Initial string: %s\n", s);
-    printf("Length: %zu\n", sl_len(s, &err));
-    printf("Capacity: %zu\n\n", sl_cap(s, &err));
+    printf("Length: %zu\n", sl_len(s, NULL));
+    printf("Capacity: %zu\n\n", sl_cap(s, NULL));
 
     // Append a new C string
     s = sl_append_cstr(s, " World", &err);
@@ -152,8 +152,8 @@ int main(void) {
     }
 
     printf("After append: %s\n", s);
-    printf("Length: %lu\n", sl_len(s, &err));
-    printf("Capacity: %lu\n\n", sl_cap(s, &err));
+    printf("Length: %zu\n", sl_len(s, &err));
+    printf("Capacity: %zu\n\n", sl_cap(s, &err));
 
     // Free the string
     sl_free(&s, &err);
