@@ -4,20 +4,27 @@
 #include <stdint.h>
 #include <limits.h>
 #include <stddef.h>
+#include <stdbool.h>
 
 // this constant is used to verify if the string is valid
-#define SL_MAGIC 0x534C4942 
+#define SL_MAGIC 0x534C4942
+
+#define FNV_PRIME 1099511628211ULL
+#define FNV_OFFSET 14695981039346656037ULL
+
+
+/* ===== INTERNAL FUNCTIONS ===== */
 
 /** 
  * Header string
  * 
  * The string is stored as a struct `sl_hdr` followed immediately by
  * the char* buffer in memory.
- * 
  * Total allocated size: sizeof(sl_hdr) + cap
  */
 typedef struct sl_hdr {
     uint32_t magic; /**< If set to SL_MAGIC, the string is valid */
+    uint64_t hash;  /**< String hash number */
     size_t len;     /**< Length of the string (excluding null term) */
     size_t cap;     /**< Capacity of data buffer (including null term) */
     char data[];    /**< Flexible array member (the data buffer) */
@@ -26,7 +33,7 @@ typedef struct sl_hdr {
 /**
  * Utility function to set an error to a sl_err variable
  */
-static inline void sl_set_err(sl_err *err, sl_err code) {
+static inline void sl__set_err(sl_err *err, sl_err code) {
     if(err) *err = code;
 }
 
@@ -43,7 +50,7 @@ static inline void sl_set_err(sl_err *err, sl_err code) {
  * @note This function is only used internally. It assumes the string
  *       was allocated by the library (sl_validate will validate the string)
  */
-static inline sl_hdr *sl_get_hdr(const sl_str str) {
+static inline sl_hdr *sl__get_hdr(const sl_str str) {
     return (sl_hdr *)((char *)str - offsetof(sl_hdr, data));
 }
 
@@ -57,10 +64,10 @@ static inline sl_hdr *sl_get_hdr(const sl_str str) {
  * 
  * @return A value of the sl_err enum representing the error code
  */
-static inline sl_err sl_validate(sl_str str, sl_hdr **out_hdr){
+static inline sl_err sl__validate(sl_str str, sl_hdr **out_hdr){
     if(!str) return SL_ERR_NULL;
     
-    sl_hdr *hdr = sl_get_hdr(str);
+    sl_hdr *hdr = sl__get_hdr(str);
 
     // if the magic does not match the value of the SL_VALID constant,
     // it menas string was not created by the library or has been invalidated
@@ -71,6 +78,22 @@ static inline sl_err sl_validate(sl_str str, sl_hdr **out_hdr){
     return SL_OK;
 }
 
+/**
+ * Get the hash number from a series of bytes (fnv-1a)
+ */
+static uint64_t sl__compute_hash(const void *bytes, size_t len) {
+    uint64_t hash = FNV_OFFSET;
+    const unsigned char *ptr = (const unsigned char*) bytes;
+
+    for(size_t i=0; i<len; i++) {
+        hash ^= ptr[i];
+        hash *= FNV_PRIME;
+    }
+
+    return hash;
+}
+
+/* ===== PUBLIC API FUNCTIONS ===== */
 
 /**
  * Create a new dynamic string (`sl_str`) from a null-terminated C string.
@@ -88,7 +111,7 @@ static inline sl_err sl_validate(sl_str str, sl_hdr **out_hdr){
  */
 sl_str sl_from_cstr(const char *init, sl_err *err){
     if(!init) {
-        sl_set_err(err, SL_ERR_NULL);
+        sl__set_err(err, SL_ERR_NULL);
         return NULL;
     }
 
@@ -97,18 +120,19 @@ sl_str sl_from_cstr(const char *init, sl_err *err){
 
     sl_hdr *hdr = malloc(offsetof(sl_hdr, data) + cap);
     if(!hdr) {
-        sl_set_err(err, SL_ERR_ALLOC);
+        sl__set_err(err, SL_ERR_ALLOC);
         return NULL;
     } 
 
     hdr->magic = SL_MAGIC;
     hdr->len = len;
     hdr->cap = cap;
-
+    
     // copy `init` into `data`
     memcpy(hdr->data, init, len + 1);
-
-    sl_set_err(err, SL_OK);
+    
+    hdr->hash = sl__compute_hash(hdr->data, len);
+    sl__set_err(err, SL_OK);
     return hdr->data;
 }
 
@@ -126,15 +150,15 @@ sl_str sl_from_cstr(const char *init, sl_err *err){
 void sl_free(sl_str *str, sl_err *err){
     // do nothing
     if (!str || !*str) {
-        sl_set_err(err, SL_OK);
+        sl__set_err(err, SL_OK);
         return;
     }
 
     sl_hdr *hdr;
-    sl_err e = sl_validate(*str, &hdr);
+    sl_err e = sl__validate(*str, &hdr);
 
     if(e != SL_OK) {
-        sl_set_err(err, e);
+        sl__set_err(err, e);
         return;
     }
 
@@ -142,7 +166,7 @@ void sl_free(sl_str *str, sl_err *err){
     free(hdr);
     *str = NULL;    // prevent use after free
 
-    sl_set_err(err, SL_OK);
+    sl__set_err(err, SL_OK);
 }
 
 /**
@@ -154,14 +178,14 @@ void sl_free(sl_str *str, sl_err *err){
  */
 size_t sl_len(sl_str str, sl_err *err){
     sl_hdr *hdr;
-    sl_err e = sl_validate(str, &hdr);
+    sl_err e = sl__validate(str, &hdr);
 
     if(e != SL_OK) {
-        sl_set_err(err, e);
+        sl__set_err(err, e);
         return SIZE_MAX;
     }
 
-    sl_set_err(err, SL_OK);
+    sl__set_err(err, SL_OK);
     return hdr->len;
 }
 
@@ -177,14 +201,14 @@ size_t sl_len(sl_str str, sl_err *err){
  */
 size_t sl_cap(sl_str str, sl_err *err){
     sl_hdr *hdr;
-    sl_err e = sl_validate(str, &hdr);
+    sl_err e = sl__validate(str, &hdr);
 
     if(e != SL_OK) {
-        sl_set_err(err, e);
+        sl__set_err(err, e);
         return SIZE_MAX;
     }
 
-    sl_set_err(err, SL_OK);
+    sl__set_err(err, SL_OK);
     return hdr->cap;
 }
 
@@ -203,15 +227,15 @@ size_t sl_cap(sl_str str, sl_err *err){
  */
 sl_str sl_append_cstr(sl_str str, const char *init, sl_err *err){
     if(!init) {
-        sl_set_err(err, SL_ERR_NULL);
+        sl__set_err(err, SL_ERR_NULL);
         return str;
     }
 
     sl_hdr *hdr;
-    sl_err e = sl_validate(str, &hdr);
+    sl_err e = sl__validate(str, &hdr);
 
     if(e != SL_OK) {
-        sl_set_err(err, e);
+        sl__set_err(err, e);
         return str;
     }
 
@@ -222,9 +246,9 @@ sl_str sl_append_cstr(sl_str str, const char *init, sl_err *err){
 
     // if new capacity exceeds the current capacity, reallocate the memory
     if(new_cap > hdr->cap) {
-        sl_hdr *new_hdr = realloc(sl_get_hdr(str), offsetof(sl_hdr, data) + new_cap);
+        sl_hdr *new_hdr = realloc(sl__get_hdr(str), offsetof(sl_hdr, data) + new_cap);
         if(!new_hdr) {
-            sl_set_err(err, SL_ERR_ALLOC);
+            sl__set_err(err, SL_ERR_ALLOC);
             return NULL; 
         }
         hdr = new_hdr;
@@ -236,7 +260,59 @@ sl_str sl_append_cstr(sl_str str, const char *init, sl_err *err){
     // set new field values
     hdr->len = new_len;
     hdr->cap = new_cap;
+    hdr->hash = sl__compute_hash(hdr->data, new_len);
     
-    sl_set_err(err, SL_OK);
+    sl__set_err(err, SL_OK);
     return hdr->data;
+}
+
+/**
+ * Check if two strings (`sl_str`) are equal
+ * 
+ * This function first compares string hashes and lengths to quickly detect inequality. 
+ * Only if both hash and length are equal, it performs a byte-by-byte comparison to be
+ * sure strings have the same content.
+ * 
+ * Time complexity:
+ * - Best case (hash/length mismatch or pointer equality) O(1)
+ * - Worst case (hash and length match): O(n)
+ * 
+ * @param str1 The first `sl_str` to compare
+ * @param str2 The second `sl_str` to compare
+ * @param err Pointer to an `sl_err` variable, can be NULL.
+ * 
+ * @return `true` if the two strings are equal and `false` otherwise
+ * 
+ * @note Two strings are considered equal if they have the same length and content
+ *       or if they point to the same string
+ */
+bool sl_eq(sl_str str1, sl_str str2, sl_err *err) {
+    sl_hdr *h1, *h2;
+
+    sl_err e1 = sl__validate(str1, &h1);
+    sl_err e2 = sl__validate(str2, &h2);
+
+    if(e1 != SL_OK || e2 != SL_OK) {
+        sl__set_err(err, e1 != SL_OK ? e1 : e2);
+        return false;
+    }
+
+    if(str1 == str2) {
+        sl__set_err(err, SL_OK);
+        return true;
+    }
+
+    if(h1->hash != h2->hash) {
+        sl__set_err(err, SL_OK);
+        return false;
+    }
+
+    if(h1->len != h2->len) {
+        sl__set_err(err, SL_OK);
+        return false;
+    }
+
+    bool eq = memcmp(h1->data, h2->data, h1->len) == 0;
+    sl__set_err(err, SL_OK);
+    return eq;
 }

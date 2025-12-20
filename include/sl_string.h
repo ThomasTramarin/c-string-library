@@ -2,6 +2,7 @@
 #define SL_STRING_H
 
 #include <stddef.h>
+#include <stdbool.h>
 
 typedef char *sl_str; // opaque type
 
@@ -19,5 +20,6 @@ void sl_free(sl_str *str, sl_err *err);
 size_t sl_len(sl_str str, sl_err *err);
 size_t sl_cap(sl_str str, sl_err *err);
 sl_str sl_append_cstr(sl_str str, const char *init, sl_err *err);
+bool sl_eq(sl_str str1, sl_str str2, sl_err *err);
 
 #endif // SL_STRING_H
