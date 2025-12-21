@@ -11,7 +11,9 @@ This is a **learning project** created to explore and practice with the C progra
     2.2. [Create a string](#create-a-string)  
     2.3. [Append to a string](#append-to-a-string)  
     2.4. [Get the length and the capacity](#get-the-length-and-the-capacity)  
-    2.5  [Compare strings](#compare-strings)  
+    2.5. [Use of hashes](#use-of-hashes)
+    2.6. [Compare strings](#compare-strings)  
+    2.7. [Free a string](#free-a-string)
 3. [API Reference](#api-reference)
 
 ## Installation
@@ -72,6 +74,7 @@ sl_str s = sl_from_cstr("Hello", &err);
 
 if (err != SL_OK) {
     fprintf(stderr, "Error creating the string: %d\n", err);
+    return 1;
 }
 
 printf("%s\n", s);
@@ -94,6 +97,33 @@ You can check the current length of a string with `sl_len`, which returns the nu
 size_t len = sl_len(s, &err);
 size_t cap = sl_cap(s, &err);
 printf("Length: %zu\nCapacity: %zu\n", len, cap);
+```
+
+### Use of hashes
+Each `sl_str` string contains a `hash` field in the header. This is a `uint64_t` number that represents the **64 bit FNV-1a hash** of the current string content. So when the string content changes, also the hash is recalculated.
+
+To get the hash of a dynamic string, you can use the function `sl_hash`. For example:
+```c
+uint64_t s_hash = sl_hash(s, &err);
+printf("%zu", s_hash);
+```
+
+You can compute hashes using the `sl_compute_hash` and `sl_compute_hash_cstr` functions.
+This allows you to compare a dynamic string without performing a full string comparison.
+
+For example:
+```c
+const char *keyword = "while";
+uint64_t keyword_hash = sl_compute_hash_cstr(keyword);
+
+sl_err err;
+sl_str s = sl_from_cstr("while", &err);
+
+if (sl_hash(s, NULL) == keyword_hash) {
+    printf("Keyword matched!\n");
+}
+
+sl_free(&s, NULL);
 ```
 
 ### Compare strings
@@ -269,9 +299,8 @@ Memory is reallocated exactly to fit the new length + null terminator if needed.
 - `err`: Pointer to a `sl_err` variable, can be `NULL`
 
 #### Returns
-- The reallocated string pointer after append
-- `NULL` if memory allocation fails
-- The original `str` if validation fails or `init` is `NULL`
+- The updated string pointer (possibly reallocated).
+- If an error occurs, the original string is returned unchanged and `err` is set.
 
 #### Error Codes
 - `SL_OK`: Success
@@ -303,3 +332,77 @@ Checks if two dynamic strings are equal. The function first compares string hash
 - `SL_OK`: Success
 - `SL_ERR_NULL`: One or both input strings are `NULL`
 - `SL_ERR_INVALID`: One or both strings are not valid `sl_str`
+
+---
+
+### `sl_hash`
+
+```c
+uint64_t sl_hash(sl_str str, sl_err *err);
+```
+
+#### Description
+Returns the precomputed hash of a dynamic string.
+The hash is calculated internally using the **64-bit FNV-1a algorithm** and is automatically updated every time the string content changes (for example after `sl_append_cstr`).
+
+This function is useful for fast comparisons, hash tables, and parsers.
+
+#### Parameters
+- `str`: Pointer to a valid `sl_str`
+- `err`: Pointer to a `sl_err` variable, can be `NULL`
+
+#### Returns
+- The hash of the string on success.
+- `0` if an error occured (check `err`)
+
+#### Error Codes
+- `SL_OK`: Success
+- `SL_ERR_NULL`: Input string is `NULL`
+- `SL_ERR_INVALID`: Input string is not a valid `sl_str`
+
+---
+
+### `sl_compute_hash`
+
+```c
+uint64_t sl_compute_hash(const void *data, size_t len);
+```
+
+#### Description
+Calculate a **64-bit FNV-1a hash** of a generic memory buffer.
+
+This function works on **binary data**, so it can calculate buffers containing `'\0'` bytes.
+
+#### Parameters
+- `data`: Pointer to a memory buffer
+- `len`: Length of the buffer in bytes
+
+#### Returns
+- The computed hash.
+
+#### Notes
+- This function never fails.
+
+---
+
+### `sl_compute_hash_cstr`
+
+```c
+uint64_t sl_compute_hash_cstr(const char *str);
+```
+
+#### Description
+Calculate a **64-bit FNV-1a hash** of a null-terminated C string.
+
+This function is a wrapper of `sl_compute_hash` that automaticaly calculates the string length using
+`strlen`. Thus, if you work with normal C strings (and not binary buffer), you can use this function.
+
+#### Parameters
+- `str`: Pointer to a null-terminated C string
+
+#### Returns
+- The computed 64-bit hash.
+- `0` if `str` is `NULL`.
+
+#### Notes
+- This function never fails.
