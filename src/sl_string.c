@@ -24,7 +24,7 @@
  */
 typedef struct sl_hdr {
     uint32_t magic; /**< If set to SL_MAGIC, the string is valid */
-    uint64_t hash;  /**< String hash number */
+    uint64_t hash;  /**< String hash number (FNV-1a) */
     size_t len;     /**< Length of the string (excluding null term) */
     size_t cap;     /**< Capacity of data buffer (including null term) */
     char data[];    /**< Flexible array member (the data buffer) */
@@ -222,8 +222,8 @@ size_t sl_cap(sl_str str, sl_err *err){
  * @param init A null-terminated C string to append. Must not be NULL.
  * @param err Pointer to an `sl_err` variable, can be NULL.
  * 
- * @return The reallocated string pointer after append.
- *         Returns NULL if memory allocation fails.
+ * @return The (possibly reallocated) string pointer.
+ *         If an error occurs, the original string is returned unchanged and `err` is set.
  */
 sl_str sl_append_cstr(sl_str str, const char *init, sl_err *err){
     if(!init) {
@@ -249,7 +249,7 @@ sl_str sl_append_cstr(sl_str str, const char *init, sl_err *err){
         sl_hdr *new_hdr = realloc(sl__get_hdr(str), offsetof(sl_hdr, data) + new_cap);
         if(!new_hdr) {
             sl__set_err(err, SL_ERR_ALLOC);
-            return NULL; 
+            return str; 
         }
         hdr = new_hdr;
     }
@@ -264,6 +264,52 @@ sl_str sl_append_cstr(sl_str str, const char *init, sl_err *err){
     
     sl__set_err(err, SL_OK);
     return hdr->data;
+}
+
+/**
+ * Compute FNV-1a hash of a generic buffer
+ * 
+ * @param data Pointer to the data buffer
+ * @param len Length of the buffer in bytes
+ * 
+ * @return 64-bit FNV-1a hash
+ */
+uint64_t sl_compute_hash(const void *data, size_t len) {
+    return sl__compute_hash(data, len);
+}
+
+/**
+ * Compute FNV-1a hash of a C string
+ * 
+ * @param str Pointer to the null-terminated C string
+ * @return 64-bit FNV-1a hash
+ */
+uint64_t sl_compute_hash_cstr(const char *str) {
+    if(!str) return 0;
+    return sl__compute_hash(str, strlen(str));
+}
+
+/**
+ * Get the hash of a dynamic string
+ * 
+ * @param str Pointer to the string buffer
+ * @param err Pointer to an `sl_err` variable, can be NULL.
+ * 
+ * @return A `uint64_t` representing the hash. If an error occured, the function
+ *         returns 0, so it is recommended to verify `err`
+ * 
+ * @note The returned hash change after the content is modified
+ */
+uint64_t sl_hash(sl_str str, sl_err *err){
+    sl_hdr *hdr;
+    sl_err e = sl__validate(str, &hdr);
+    if(e != SL_OK) {
+        sl__set_err(err, e);
+        return 0;
+    } 
+
+    sl__set_err(err, SL_OK);
+    return hdr->hash;
 }
 
 /**
