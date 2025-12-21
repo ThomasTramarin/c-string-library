@@ -108,11 +108,60 @@ void test_sl_eq(void) {
     sl_free(&c, &err);
 }
 
+void test_hash(void){
+    // basics
+    char *str = "hello";
+    sl_err err;
+    uint64_t hash_buf = sl_compute_hash(str, strlen(str));
+    uint64_t hash_cstr = sl_compute_hash_cstr(str);
+
+    TEST_ASSERT_EQUAL(hash_buf, hash_cstr);
+
+    sl_str s = sl_from_cstr(str, &err);
+    TEST_ASSERT_EQUAL(SL_OK, err);
+
+    uint64_t s_hash = sl_hash(s, &err);
+    TEST_ASSERT_EQUAL(SL_OK, err);
+    TEST_ASSERT_EQUAL(hash_cstr, s_hash);
+
+    // hash changes after append
+    uint64_t old_hash = s_hash;
+    s = sl_append_cstr(s, " world", &err);
+    TEST_ASSERT_EQUAL(SL_OK, err);
+
+    uint64_t new_hash = sl_hash(s, &err);
+    TEST_ASSERT_EQUAL(SL_OK, err);
+    TEST_ASSERT_NOT_EQUAL(old_hash, new_hash);
+
+    sl_free(&s, &err);
+    TEST_ASSERT_EQUAL(SL_OK, err);
+
+    // empty string hash
+    char *empty = "";
+    uint64_t empty_buf  = sl_compute_hash(empty, 0);
+    uint64_t empty_cstr = sl_compute_hash_cstr(empty);
+
+    TEST_ASSERT_EQUAL(empty_buf, empty_cstr);
+
+    s = sl_from_cstr(empty, &err);
+    TEST_ASSERT_EQUAL(SL_OK, err);
+    TEST_ASSERT_EQUAL(empty_cstr, sl_hash(s, &err));
+    sl_free(&s, NULL);
+    
+    // NULL
+    uint64_t null_hash = sl_hash(NULL, &err);
+    TEST_ASSERT_EQUAL(0, null_hash);
+    TEST_ASSERT_EQUAL(SL_ERR_NULL, err);
+
+    TEST_ASSERT_EQUAL(0, sl_compute_hash_cstr(NULL));
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_sl_from_cstr);
     RUN_TEST(test_sl_append_cstr);
     RUN_TEST(test_use_after_free);
     RUN_TEST(test_sl_eq);
+    RUN_TEST(test_hash);
     return UNITY_END();
 }
