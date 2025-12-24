@@ -1,6 +1,6 @@
-#include "unity.h"
 #include "sl_string.h"
 #include "string.h"
+#include "unity.h"
 
 void setUp(void) {}
 void tearDown(void) {}
@@ -108,7 +108,7 @@ void test_sl_eq(void) {
     sl_free(&c, &err);
 }
 
-void test_hash(void){
+void test_hash(void) {
     // basics
     char *str = "hello";
     sl_err err;
@@ -138,7 +138,7 @@ void test_hash(void){
 
     // empty string hash
     char *empty = "";
-    uint64_t empty_buf  = sl_compute_hash(empty, 0);
+    uint64_t empty_buf = sl_compute_hash(empty, 0);
     uint64_t empty_cstr = sl_compute_hash_cstr(empty);
 
     TEST_ASSERT_EQUAL(empty_buf, empty_cstr);
@@ -147,13 +147,38 @@ void test_hash(void){
     TEST_ASSERT_EQUAL(SL_OK, err);
     TEST_ASSERT_EQUAL(empty_cstr, sl_hash(s, &err));
     sl_free(&s, NULL);
-    
+
     // NULL
     uint64_t null_hash = sl_hash(NULL, &err);
     TEST_ASSERT_EQUAL(0, null_hash);
     TEST_ASSERT_EQUAL(SL_ERR_NULL, err);
 
     TEST_ASSERT_EQUAL(0, sl_compute_hash_cstr(NULL));
+}
+
+void test_sl_from_bytes(void) {
+    sl_err err;
+
+    // basic test with a normal string
+    const char data[] = "Hello";
+    sl_str s = sl_from_bytes(data, 5, &err);
+    TEST_ASSERT_NOT_NULL(s);
+    TEST_ASSERT_EQUAL(SL_OK, err);
+    TEST_ASSERT_EQUAL(5, sl_len(s, &err));
+    TEST_ASSERT_TRUE(memcmp(s, data, 5) == 0);
+    TEST_ASSERT_EQUAL_CHAR('\0', s[5]);
+    sl_free(&s, &err);
+    TEST_ASSERT_NULL(s);
+
+    // test with null bytes inside
+    const unsigned char bytes[] = {'A', 0, 'B', 0, 67};
+    s = sl_from_bytes(bytes, sizeof(bytes), &err);
+    TEST_ASSERT_NOT_NULL(s);
+    TEST_ASSERT_EQUAL(SL_OK, err);
+    TEST_ASSERT_EQUAL(sizeof(bytes), sl_len(s, &err));
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(bytes, s, sizeof(bytes));
+    sl_free(&s, &err);
+    TEST_ASSERT_NULL(s);
 }
 
 int main(void) {
@@ -163,5 +188,7 @@ int main(void) {
     RUN_TEST(test_use_after_free);
     RUN_TEST(test_sl_eq);
     RUN_TEST(test_hash);
+    RUN_TEST(test_sl_from_bytes);
+
     return UNITY_END();
 }
