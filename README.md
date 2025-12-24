@@ -11,7 +11,7 @@ This is a **learning project** created to explore and practice with the C progra
     2.2. [Create a string](#create-a-string)  
     2.3. [Append to a string](#append-to-a-string)  
     2.4. [Get the length and the capacity](#get-the-length-and-the-capacity)  
-    2.5. [Use of hashes](#use-of-hashes)
+    2.5. [Use of hashes](#use-of-hashes)  
     2.6. [Compare strings](#compare-strings)  
     2.7. [Free a string](#free-a-string)
 3. [API Reference](#api-reference)
@@ -78,6 +78,24 @@ if (err != SL_OK) {
 }
 
 printf("%s\n", s);
+```
+
+If you need to store binary data or buffers that may contain null bytes (`\0`), you can use `sl_from_bytes`.
+Unlike `sl_from_cstr`, this function does not require a null terminator in the input and does not append one internally.
+
+Example:
+```c
+unsigned char data[] = {'A', 'B', 0, 'C'};
+sl_err err;
+
+sl_str s = sl_from_bytes(data, sizeof(data), &err);
+
+if(err != SL_OK) {
+    fprintf(stderr, "Error creating string from bytes: %d", err);
+    return 1;
+}
+
+printf("Length: %zu\n", sl_len(s, NULL));   // prints 4
 ```
 
 ### Append to a string
@@ -206,6 +224,31 @@ Creates a new string from a null-terminated C string.
 
 #### Parameters
 - `init`: Pointer to a C string
+- `err`: Pointer to a `sl_err` variable, can be `NULL`
+
+#### Returns
+- `sl_str` on success.
+- `NULL` if creation fails (check `sl_err` for more details).
+#### Error Codes
+- `SL_OK`: Success
+- `SL_ERR_ALLOC`: Memory allocation failed
+- `SL_ERR_NULL`: Input `init` is `NULL`
+
+---
+
+### `sl_from_bytes`
+```c
+sl_str sl_from_bytes(const void *bytes, size_t len, sl_err *err);
+```
+#### Description
+Creates a dynamic string from a raw memory buffer.
+Unlike `sl_from_cstr`, this function is binary safe. It copies exactly `len` bytes,
+even if the buffer contains `\0` bytes.
+The function does not append a null terminator (`cap` = `len`)
+
+#### Parameters
+- `data`: Pointer to a memory buffer
+- `len`: Number of bytes to copy
 - `err`: Pointer to a `sl_err` variable, can be `NULL`
 
 #### Returns
@@ -406,3 +449,4 @@ This function is a wrapper of `sl_compute_hash` that automaticaly calculates the
 
 #### Notes
 - This function never fails.
+
