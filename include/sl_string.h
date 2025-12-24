@@ -17,6 +17,9 @@ typedef enum {
 
 
 sl_str sl_from_cstr(const char *init, sl_err *err);
+sl_str sl_from_bytes(const void *bytes, size_t len, sl_err *err);
+
+
 void sl_free(sl_str *str, sl_err *err);
 size_t sl_len(sl_str str, sl_err *err);
 size_t sl_cap(sl_str str, sl_err *err);
